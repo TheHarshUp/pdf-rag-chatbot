@@ -6,6 +6,9 @@ from utils.llm import ask_llm
 from utils.pdf_reader import read_pdf
 from utils.chunker import chunk_text
 
+import os
+os.makedirs("uploads", exist_ok=True)
+
 st.title("PDF RAG Chatbot")
 
 if "messages" not in st.session_state:
