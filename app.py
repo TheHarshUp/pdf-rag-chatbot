@@ -5,6 +5,7 @@ from utils.vector_store import search, store_embeddings
 from utils.llm import ask_llm
 from utils.pdf_reader import read_pdf
 from utils.chunker import chunk_text
+from utils.table_parser import extract_tables
 
 import os
 os.makedirs("uploads", exist_ok=True)
@@ -94,7 +95,24 @@ if uploaded_files:
             with st.spinner(f"Processing {uploaded_file.name}..."):
 
                 text = read_pdf(file_path)
-                chunks = chunk_text(text)
+
+                # NEW: extract tables
+                tables = extract_tables(file_path)
+
+                table_text = ""
+                for table_data in tables:
+                    page = table_data["page"]
+                    table = table_data["table"]
+
+                    table_text += f"\nTable from Page {page}:\n"
+
+                    for row in table:
+                        cleaned_row = [str(cell) if cell else "" for cell in row]
+                        table_text += " | ".join(cleaned_row) + "\n"
+
+                combined_text = text + "\n" + table_text
+
+                chunks = chunk_text(combined_text)
                 embeddings = generate_embeddings(chunks)
 
                 store_embeddings(chunks, embeddings, uploaded_file.name)
