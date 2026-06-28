@@ -7,6 +7,7 @@ from utils.chunker import chunk_text
 from utils.embedder import generate_embeddings
 from utils.vector_store import store_embeddings, search
 from utils.llm import ask_llm
+from utils.image_extractor import extract_images
 
 os.makedirs("uploads", exist_ok=True)
 
@@ -25,6 +26,9 @@ if "processed_pdfs" not in st.session_state:
 
 if "tables" not in st.session_state:
     st.session_state.tables = {}
+
+if "images" not in st.session_state:
+    st.session_state.images = {}
 
 with st.sidebar:
     st.header("📂 Documents")
@@ -66,6 +70,10 @@ if uploaded_files:
                 f.write(uploaded_file.read())
 
             text = read_pdf(file_path)
+            image_paths = extract_images(file_path)
+            st.session_state.images[uploaded_file.name] = image_paths
+            st.write(f"Extracted {len(image_paths)} images")
+
             tables = []
             if uploaded_file.size < 2_000_000:
                 tables = extract_tables(file_path)
@@ -124,6 +132,19 @@ if question:
         )
 
         st.rerun()
+    if "show image" in question.lower() or "show graph" in question.lower():
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": "🖼 Showing extracted images:"
+        })
+
+        for pdf_name, imgs in st.session_state.images.items():
+            st.write(f"Found {len(imgs)} images in {pdf_name}")
+
+            for img in imgs[:5]:
+                st.image(img, width=300)
+
+        st.stop()
     with st.spinner("Thinking..."):
         question_embedding = generate_embeddings(question)
         results, metadata = search(question_embedding, top_k=3)
