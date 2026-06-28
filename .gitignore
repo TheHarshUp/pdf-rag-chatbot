@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 chroma_db/
 uploads/
+extracted_images/
 .env
