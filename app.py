@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-
+import pandas as pd
 from utils.pdf_reader import read_pdf
 from utils.table_parser import extract_tables
 from utils.chunker import chunk_text
@@ -10,11 +10,7 @@ from utils.llm import ask_llm
 
 os.makedirs("uploads", exist_ok=True)
 
-st.set_page_config(
-    page_title="Multimodal RAG Assistant",
-    page_icon="🤖",
-    layout="wide"
-)
+st.set_page_config(page_title="Multimodal RAG Assistant", page_icon="🤖", layout="wide")
 
 st.markdown("""
 # 🤖 Multimodal RAG Assistant
@@ -27,19 +23,24 @@ if "messages" not in st.session_state:
 if "processed_pdfs" not in st.session_state:
     st.session_state.processed_pdfs = set()
 
+if "tables" not in st.session_state:
+    st.session_state.tables = {}
+
 with st.sidebar:
     st.header("📂 Documents")
 
     uploaded_files = st.file_uploader(
-        "Upload PDFs",
-        type=["pdf"],
-        accept_multiple_files=True
+        "Upload PDFs", type=["pdf"], accept_multiple_files=True
     )
 
     if uploaded_files:
         st.markdown("### Uploaded Files")
         for file in uploaded_files:
-            status = "✅ Indexed" if file.name in st.session_state.processed_pdfs else "⏳ Processing"
+            status = (
+                "✅ Indexed"
+                if file.name in st.session_state.processed_pdfs
+                else "⏳ Processing"
+            )
             st.write(f"{status} — {file.name}")
 
     if st.button("🗑 Clear Chat"):
@@ -58,7 +59,6 @@ Upload PDFs and ask:
 # -------- PDF PROCESSING --------
 if uploaded_files:
     for uploaded_file in uploaded_files:
-
         if uploaded_file.name not in st.session_state.processed_pdfs:
             file_path = f"uploads/{uploaded_file.name}"
 
@@ -67,11 +67,9 @@ if uploaded_files:
 
             text = read_pdf(file_path)
             tables = []
-
-            tables = []
-
             if uploaded_file.size < 2_000_000:
                 tables = extract_tables(file_path)
+                st.session_state.tables[uploaded_file.name] = tables
             else:
                 st.warning("Large PDF detected — skipping table extraction")
 
@@ -80,15 +78,6 @@ if uploaded_files:
             for table_data in tables:
                 page = table_data["page"]
                 table = table_data["table"]
-
-                table_text += f"\nTable from Page {page}:\n"
-
-                for row in table:
-                    cleaned_row = [
-                        str(cell) if cell else ""
-                        for cell in row
-                    ]
-                    table_text += " | ".join(cleaned_row) + "\n"
 
             combined_text = f"{text}\n{table_text}"
 
@@ -107,25 +96,46 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
+        if message["content"] == "📊 Here are the extracted tables:":
+            for pdf_name, pdf_tables in st.session_state.tables.items():
+                st.subheader(f"📄 {pdf_name}")
+
+                for i, table_data in enumerate(pdf_tables):
+                    page = table_data["page"]
+                    table = table_data["table"]
+
+                    st.markdown(f"### Table {i + 1} (Page {page})")
+
+                    if len(table) > 1:
+                        headers = table[0]
+                        rows = table[1:]
+
+                        df = pd.DataFrame(rows, columns=headers)
+                        st.dataframe(df, width="stretch")
+
 # -------- QUESTION --------
 question = st.chat_input("Ask anything about your documents...")
 
 if question:
-    st.session_state.messages.append({
-        "role": "user",
-        "content": question
-    })
+    st.session_state.messages.append({"role": "user", "content": question})
+    if "table" in question.lower():
+        st.session_state.messages.append(
+            {"role": "assistant", "content": "📊 Here are the extracted tables:"}
+        )
 
+        st.rerun()
     with st.spinner("Thinking..."):
         question_embedding = generate_embeddings(question)
         results, metadata = search(question_embedding, top_k=3)
         answer = ask_llm(question, results)
 
-        sources = list(set(
-            meta["source"]
-            for meta in metadata
-            if meta is not None and "source" in meta
-        ))
+        sources = list(
+            set(
+                meta["source"]
+                for meta in metadata
+                if meta is not None and "source" in meta
+            )
+        )
 
         formatted_answer = f"""
 {answer}
@@ -134,9 +144,8 @@ if question:
 📄 Sources: {", ".join(sources)}
 """
 
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": formatted_answer
-        })
+        st.session_state.messages.append(
+            {"role": "assistant", "content": formatted_answer}
+        )
 
     st.rerun()
