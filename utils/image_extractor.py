@@ -24,10 +24,10 @@ def extract_images(pdf_path):
             width = base_image["width"]
             height = base_image["height"]
 
-            # Skip tiny icons / logos
+            ratio = width / height
+
             if width < 400 or height < 300:
                 continue
-            ratio = width / height
 
             if ratio > 4 or ratio < 0.25:
                 continue
@@ -40,6 +40,12 @@ def extract_images(pdf_path):
             with open(image_path, "wb") as f:
                 f.write(image_bytes)
 
-            image_paths.append(image_path)
+            image_paths.append({
+                "path": image_path,
+                "page": page_num + 1,
+                "width": width,
+                "height": height,
+                "ratio": ratio
+            })
 
     return image_paths

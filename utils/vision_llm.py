@@ -7,7 +7,7 @@ def ask_vision(image_path, prompt):
         image_base64 = base64.b64encode(f.read()).decode("utf-8")
 
     payload = {
-        "model": "qwen2-vl-2b-instruct",
+        "model": "qwen/qwen2.5-vl-7b",
         "messages": [
             {
                 "role": "user",
@@ -30,5 +30,32 @@ def ask_vision(image_path, prompt):
         "http://127.0.0.1:1234/v1/chat/completions",
         json=payload
     )
+    if response.status_code != 200:
+        print("Vision API Error:", response.text)
+
     result = response.json()
-    return result["choices"][0]["message"]["content"]
+    message = result["choices"][0]["message"]
+
+    answer = message.get("content", "")
+    reasoning = message.get("reasoning_content", "")
+
+    final_text = answer if str(answer).strip() else reasoning
+
+    return final_text
+
+def classify_image(image_path):
+    prompt = """
+Reply with EXACTLY one word.
+
+YES = image contains graph/chart/plot with numeric data, bars, lines, axes
+NO = normal image, logo, screenshot, product photo, illustration
+
+Answer only YES or NO.
+"""
+
+    result = ask_vision(image_path, prompt).strip().upper()
+
+    if result.startswith("YES"):
+        return "graph"
+
+    return "photo"

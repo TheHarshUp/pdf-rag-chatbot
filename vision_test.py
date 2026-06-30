@@ -1,8 +1,5 @@
-from utils.vision_llm import ask_vision
+from utils.vision_llm import classify_image
 
-answer = ask_vision(
-    "extracted_images/Apple_Environmental_Progress_Report_2024/page_69_0.jpeg",
-    "Describe this image"
-)
-
-print(answer)
+print(classify_image(
+    "extracted_images/Apple_Environmental_Progress_Report_2024/page_1_0.jpeg"
+))

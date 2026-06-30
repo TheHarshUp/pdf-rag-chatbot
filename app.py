@@ -8,7 +8,7 @@ from utils.embedder import generate_embeddings
 from utils.vector_store import store_embeddings, search
 from utils.llm import ask_llm
 from utils.image_extractor import extract_images
-from utils.vision_llm import ask_vision
+from utils.vision_llm import ask_vision, classify_image
 import re
 
 os.makedirs("uploads", exist_ok=True)
@@ -107,9 +107,13 @@ for message in st.session_state.messages:
     avatar = "🤖" if message["role"] == "assistant" else "🧑"
 
     with st.chat_message(message["role"], avatar=avatar):
-
         if "image" in message:
-            st.image(message["image"], width=400)
+            image_data = message["image"]
+
+            if isinstance(image_data, dict):
+                st.image(image_data["path"], width=400)
+            else:
+                st.image(image_data, width=400)
 
         st.markdown(message["content"])
 
@@ -149,47 +153,91 @@ if question:
         or "chart" in question_lower
         or "figure" in question_lower
     ):
+        is_graph_query = any(
+            word in question_lower
+            for word in [
+                "graph",
+                "chart",
+                "plot",
+                "figure",
+                "diagram",
+                "visualization"
+            ]
+        )
+
         found = False
 
         for pdf_name, imgs in st.session_state.images.items():
             if len(imgs) > 0:
-                selected_image = imgs[0]
+                selected_image = None
 
-                match = re.search(r'page\s*(\d+)', question_lower)
-
-                if match:
-                    requested_page = match.group(1)
-
+                if is_graph_query:
                     for img in imgs:
-                        if f"page_{requested_page}_" in img:
+
+                        img_type = classify_image(img["path"])
+
+                        if img_type == "graph":
                             selected_image = img
                             break
-                answer = ask_vision(selected_image, question)
+                else:
+                    selected_image = imgs[0]
+                if selected_image is None:
+                    continue
 
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": f"🖼 Vision Analysis ({pdf_name}):\n\n{answer}",
-                    "image": selected_image
-                })
+                match = re.search(r"page\s*(\d+)", question_lower)
+
+                if match:
+                    requested_page = int(match.group(1))
+
+                    for img in imgs:
+                        if img["page"] == requested_page:
+                            selected_image = img
+                            break
+                
+                if selected_image is None:
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": "No graph found."
+                    })
+                    st.rerun()
+                vision_prompt = f"""
+                Analyze this image extracted from a PDF.
+
+                User question:
+                {question}
+
+                If this is a graph:
+                - Explain x-axis
+                - Explain y-axis
+                - Mention important trends
+                - Mention key values
+                """
+
+                answer = ask_vision(selected_image["path"], vision_prompt)
+
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": f"🖼 Vision Analysis ({pdf_name}):\n\n{answer}",
+                        "image": selected_image,
+                    }
+                )
 
                 found = True
                 break
 
         if not found:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": "No extracted images found."
-            })
+            msg = "No graph found." if is_graph_query else "No extracted images found."
+
+            st.session_state.messages.append(
+                {"role": "assistant", "content": msg}
+            )
 
         st.rerun()
     question_lower = question.lower()
 
-    if (
-        "explain this pdf" in question_lower
-        or "summarize this pdf" in question_lower
-    ):
+    if "explain this pdf" in question_lower or "summarize this pdf" in question_lower:
         for pdf_name, pdf_text in st.session_state.pdf_texts.items():
-
             summary_context = pdf_text[:20000]
 
             summary_question = """
@@ -203,10 +251,12 @@ if question:
 
             summary = ask_llm(summary_question, [summary_context])
 
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"📄 PDF Summary ({pdf_name}):\n\n{summary}"
-            })
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"📄 PDF Summary ({pdf_name}):\n\n{summary}",
+                }
+            )
 
             st.rerun()
             st.stop()
@@ -214,11 +264,7 @@ if question:
         question_embedding = generate_embeddings(question)
         active_sources = list(st.session_state.processed_pdfs)
 
-        results, metadata = search(
-            question_embedding,
-            active_sources,
-            top_k=3
-        )
+        results, metadata = search(question_embedding, active_sources, top_k=3)
         answer = ask_llm(question, results)
 
         sources = list(
