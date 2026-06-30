@@ -13,8 +13,11 @@
   <img src="https://img.shields.io/badge/VLM-Qwen2.5--VL-purple"/>
 </p>
 
----
+<p align="center">
+  <a href="https://github.com/TheHarshUp/multimodal-rag-assistant">GitHub Repository</a>
+</p>
 
+---
 # 📌 Overview
 
 Traditional RAG systems work well on text-heavy documents but struggle with:
@@ -55,21 +58,27 @@ The assistant can answer questions from multiple uploaded PDFs while understandi
 ## Home Interface
 Upload PDFs and chat with documents.
 
-![Home](screenshots/home.png)
+<p align="center">
+  <img src="screenshots/home.png" width="950"/>
+</p>
 
 ---
 
 ## Graph Detection & Vision Analysis
 Charts and graphs are automatically detected and routed to a Vision Language Model for analysis.
 
-![Graph](screenshots/graph_analysis.png)
+<p align="center">
+  <img src="screenshots/graph_analysis.png" width="950"/>
+</p>
 
 ---
 
 ## PDF Summarization
 Generate concise summaries of large academic or technical PDFs.
 
-![Summary](screenshots/summary.png)
+<p align="center">
+  <img src="screenshots/summary.png" width="950"/>
+</p>
 
 ---
 
@@ -78,7 +87,9 @@ Ask highly specific questions such as:
 
 > What is written on page 25?
 
-![Page Query](screenshots/page_query.png)
+<p align="center">
+  <img src="screenshots/page_query.png" width="950"/>
+</p>
 
 ---
 
@@ -237,7 +248,7 @@ This project addresses several real-world multimodal AI challenges:
 Clone repository:
 
 ```bash
-git clone <your_repo_url>
+git clone https://github.com/TheHarshUp/multimodal-rag-assistant.git
 cd multimodal-rag-assistant
 ```
 
